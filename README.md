@@ -60,12 +60,11 @@ python cli.py col_gen <instance_filename> [options]
 ```
 
 ### Arguments:
-```bash
 - <instance_filename>  file in mpdtw_instances_2019/
 - [options]
   - --mt enable multi-threaded enumeration
   - --cap enable capacity verification / correction
-```
+
 
 ### Examples
 ```bash
