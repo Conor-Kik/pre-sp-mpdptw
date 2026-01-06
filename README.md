@@ -1,8 +1,33 @@
-# MPDPTW Column Generation Solver
+# MPDPTW – Exact Pruned Enumeration with Set Partitioning (PRE-SP)
 
-This repository contains an implementation and experimental framework for solving  the **Multi-Pickup and Delivery Problem with Time Windows (MPDPTW)** using a **column generation–based approach**.
+This repository provides an exact solver for the Multi-Pickup and Delivery Problem with Time Windows (MPDPTW) based on a Pruned Route Enumeration with Set-Partitioning (PRE-SP) framework.
+Unlike traditional mixed-integer formulations or column-generation approaches, PRE-SP enumerates feasible single-vehicle routes a priori, applies provably safe pruning rules, and then solves a set-partitioning master problem over the reduced route set to obtain a globally optimal solution.
 
-------------------------------------------------------------------------
+---
+
+## Method Overview
+
+The PRE-SP framework consists of three main stages:
+
+### 1. Preprocessing and Time-Window Tightening
+Instance data is refined by tightening service windows and pruning infeasible arcs to reduce search complexity.
+
+### 2. Pruned Route Enumeration
+Feasible single-vehicle routes are generated using a route-feasibility subproblem:
+- Time-window feasibility enforced  
+- Pickup–delivery precedence respected  
+- (Capacitated variant) load feasibility enforced through a dynamic re-checking process  
+
+Two pruning principles guarantee efficiency without sacrificing optimality:
+- Infeasibility Propagation — if a subset of requests is infeasible, all its supersets are discarded.
+- Horizon-Based Pruning — subsets that cannot fit within the global time horizon are eliminated.
+
+### 3. Set-Partitioning Master Problem
+The resulting feasible routes form columns in a set-partitioning model that selects a minimum-cost set of routes covering all requests exactly once.
+
+Capacity is enforced dynamically: routes chosen by the master problem are re-evaluated under full capacity constraints and corrected if necessary.
+
+---
 
 ## Project Structure
 
@@ -10,88 +35,83 @@ This repository contains an implementation and experimental framework for solvin
 MATH3205_MPDPTW_Project/
 ├── src/
 │   └── mpdptw/
-│       ├── common/                 # Shared utilities (parsers, printers, etc.)
-│       └── methods/                # Solution methods (currently: column generation)
-│           └── col_gen/
-│               └── ColGenSolver.py
+│       ├── common/                 # IO utilities, preprocessing, helpers
+│       └── methods/
+│           └── pre_sp/             # PRE-SP solver implementation
+│               └── ColGenSolver.py # (legacy naming, contains PRE-SP core logic)
 │
-├── mpdtw_instances_2019/           # Benchmark instance files (.txt)
-├── docs/                           # Project report and results
+├── mpdtw_instances_2019/           # Benchmark instance files
+├── docs/                           # Report, figures, and results
 ├── cli.py                          # CLI entrypoint
-└── README.txt                      # This file
+└── README.txt
 ```
 
-------------------------------------------------------------------------
+Note: although the directory name references “col_gen”, the implementation corresponds to the PRE-SP algorithm described in the manuscript.
 
-## Running the Project (CLI)
+---
 
-The entry point is `cli.py` at the project root.
+## Running the Solver (CLI)
 
-### General usage
+The entry point is cli.py.
 
+### General Usage
 ```bash
-python cli.py col_gen <instance_filename> [solver-args...]
+python cli.py col_gen <instance_filename> [options]
 ```
 
-- `<instance_filename>` → the instance file located inside
-  `mpdtw_instances_2019/`
-- `[solver-args...]` → optional arguments for the column generation
-  solver
+Arguments:
+- <instance_filename>  file in mpdtw_instances_2019/
+- [options]
+  - --mt enable multi-threaded enumeration
+  - --cap enable capacity verification / correction
 
-------------------------------------------------------------------------
-
-## Available Methods
-
-Currently implemented:
-
-- **`col_gen`** → Column Generation approach  
-  - Add `--mt` after the instance filename to enable
-    **multi-threaded column generation**  
-  - Add `--cap` to enforce **capacity constraints** in the master
-    and pricing problems  
-
-All solvers are contained under `src/mpdptw/methods/`.
-
-------------------------------------------------------------------------
-
-## Example Commands
-
+### Examples
 ```bash
 python cli.py col_gen l_4_25_1.txt
 python cli.py col_gen w_8_100_4.txt --mt
 python cli.py col_gen w_8_100_4.txt --mt --cap
 ```
 
-------------------------------------------------------------------------
+---
+
+## Benchmarking and Performance
+
+This solver has been evaluated on the 120 classical MPDPTW benchmarks and additional 200-node synthetic instances.
+
+Key outcomes reported in the manuscript:
+- Solves 116 / 120 benchmark instances to proven optimality
+- Particularly strong on wide and weakly structured time-window cases (W-type) where classical MIP approaches struggle
+- Successfully solves multiple 200-node instances, demonstrating scalability when structural pruning is effective
+
+---
 
 ## Environment
 
-This project was developed and tested using the following versions:
+Verified with:
+- Python 3.12.9
+- Gurobi 12.0.1
+- psutil 5.9.0
 
-- **Python:** 3.12.9  
-- **Gurobi (gurobipy):** 12.0.1  
-- **psutil:** 5.9.0  
+Ensure Gurobi is installed and properly licensed.
 
-These versions are recommended for full reproducibility.
-
-------------------------------------------------------------------------
+---
 
 ## Notes
 
-- Always run from the **project root** so paths resolve correctly.
-- The project uses **Gurobi** as the solver — ensure it is installed
-  and licensed.
+- Always execute from the project root to ensure relative paths resolve.
+- For reproducibility, use the recommended software versions above.
+- Parallel execution is automatically enabled when beneficial.
 
-------------------------------------------------------------------------
+---
 
-## References
+## Reference
 
-- This project builds on the work of  
-  **Aziez, Côté, and Coelho (2020)**  
-  *Exact algorithms for the multi-pickup and delivery problem with
-  time windows*,  
-  *European Journal of Operational Research, 284(3)*, pp. 906–919.
+If using this solver, please cite the associated paper:
 
-- The **benchmark MPDPTW instances** used in this project are sourced from:  
-  **Leandro C. Coelho — Multi-Pickup and Delivery Dataset**  
-  <https://www.leandro-coelho.com/multi-pickup-and-delivery/>
+An Exact Pruned Enumeration Method for Multi-Pickup and Delivery Problems with Time Windows  
+Conor Kikkert, University of Queensland  
+Proposes the PRE-SP framework: pruned single-vehicle route enumeration + set-partitioning master optimization with demonstrated benchmark superiority.
+
+Benchmark datasets:
+Leandro C. Coelho — Multi-Pickup and Delivery Dataset  
+https://www.leandro-coelho.com/multi-pickup-and-delivery/
