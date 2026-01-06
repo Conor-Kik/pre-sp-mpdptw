@@ -107,11 +107,10 @@ Ensure Gurobi is installed and properly licensed.
 
 ## Reference
 
-If using this solver, please cite the associated paper:
-
-An Exact Pruned Enumeration Method for Multi-Pickup and Delivery Problems with Time Windows  
-Conor Kikkert, University of Queensland  
-Proposes the PRE-SP framework: pruned single-vehicle route enumeration + set-partitioning master optimization with demonstrated benchmark superiority.
+This repository accompanies ongoing research on an exact route-enumeration
+framework (PRE-SP) for the Multi-Pickup and Delivery Problem with Time Windows.
+A full manuscript is currently in preparation and has not yet been submitted.
+Details and results may therefore evolve.
 
 Benchmark datasets:
 Leandro C. Coelho — Multi-Pickup and Delivery Dataset  
