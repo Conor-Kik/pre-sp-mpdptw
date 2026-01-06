@@ -37,7 +37,7 @@ MATH3205_MPDPTW_Project/
 │   └── mpdptw/
 │       ├── common/                 # IO utilities, preprocessing, helpers
 │       └── methods/
-│           └──\col_generation      #a-priori column generation solver
+│           └──col_generation/      #a-priori column generation solver
 │               └── multi_thread_route_generation.py 
 │
 ├── mpdtw_instances_2019/           # Benchmark instance files
@@ -59,11 +59,13 @@ The entry point is cli.py.
 python cli.py col_gen <instance_filename> [options]
 ```
 
-Arguments:
+### Arguments:
+```bash
 - <instance_filename>  file in mpdtw_instances_2019/
 - [options]
   - --mt enable multi-threaded enumeration
   - --cap enable capacity verification / correction
+```
 
 ### Examples
 ```bash
