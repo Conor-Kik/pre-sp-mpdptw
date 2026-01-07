@@ -54,7 +54,7 @@ The entry point is cli.py.
 
 ### General Usage
 ```bash
-python cli.py col_gen <instance_filename> [options]
+python cli.py pre_sp <instance_filename> [options]
 ```
 
 ### Arguments:
@@ -66,9 +66,9 @@ python cli.py col_gen <instance_filename> [options]
 
 ### Examples
 ```bash
-python cli.py col_gen l_4_25_1.txt
-python cli.py col_gen w_8_100_4.txt --mt
-python cli.py col_gen w_8_100_4.txt --mt --cap
+python cli.py pre_sp l_4_25_1.txt
+python cli.py pre_sp w_8_100_4.txt --mt
+python cli.py pre_sp n_8_200_4.txt --mt --cap
 ```
 
 ---

@@ -3,12 +3,12 @@ import sys
 import importlib
 from typing import Dict
 
-# Ensure src/ is importable
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 REGISTRY: Dict[str, str] = {
-    "col_gen": "mpdptw.methods.col_generation.route_generation:main",
-    "col_gen_mt": "mpdptw.methods.col_generation.multi_thread_route_generation:main",
+    "pre_sp": "mpdptw.methods.col_generation.route_generation:main",
+    "pre_sp_mt": "mpdptw.methods.col_generation.multi_thread_route_generation:main",
 }
 
 
@@ -38,14 +38,14 @@ def main():
     solver_argv = sys.argv[2:]
 
     # Handle --mt (multi-thread)
-    if method == "col_gen" and "--mt" in solver_argv:
+    if method == "pre_sp" and "--mt" in solver_argv:
         solver_argv.remove("--mt")
-        method = "col_gen_mt"
+        method = "pre_sp_mt"
 
-    # --- New: handle --cap flag for route generation ---
-    if method in {"col_gen", "col_gen_mt"} and "--cap" in solver_argv:
-        solver_argv.remove("--cap")  # remove flag so solver doesn’t choke
-        os.environ["ROUTE_GEN_CAP"] = "1"  # mark it via env var
+    # Handle --cap flag
+    if method in {"pre_sp", "pre_sp_mt"} and "--cap" in solver_argv:
+        solver_argv.remove("--cap")
+        os.environ["ROUTE_GEN_CAP"] = "1"
 
     func = load_entry(REGISTRY[method])
     func(solver_argv)
