@@ -1,4 +1,3 @@
-
 from math import comb
 import os
 from gurobipy import *
@@ -14,8 +13,8 @@ import pandas as pd
 
 
 # ---------------------------- Configuration Flags ---------------------------- #
-VEHICLE_CAPACITY = 0 # whether to enforce capacity feasibility via re-run
-PRINT_ROUTES = 0     # whether to print selected routes after optimization
+VEHICLE_CAPACITY = 0  # whether to enforce capacity feasibility via re-run
+PRINT_ROUTES = 0  # whether to print selected routes after optimization
 
 
 # ----------------------- Worker Initialization for Gurobi -------------------- #
@@ -118,7 +117,7 @@ def generate_routes(instance: str, model: Model):
     path = Path(instance)
     filename = path.name
     Time_Window = not filename.startswith("w")  # "w..." instances disable TW
-    Narrow = filename.startswith("n") 
+    Narrow = filename.startswith("n")
     if Narrow:
         mt_threshold = 5
     else:
@@ -126,18 +125,18 @@ def generate_routes(instance: str, model: Model):
     print("USING MULTI-THREADING FOR ROUTE GENERATION")
     print("Workers to use:", psutil.cpu_count(logical=False))
     TIME_LIMIT = 3600.0
-    cap_end_time = 0 
+    cap_end_time = 0
     cap_start_time = 0
     start_time = time.perf_counter()
     time_limit_hit = False
     inst = build_milp_data(str(instance), generate_W_set=False)
     metrics = {
-        "sts": None,              # 0 or 1
-        "uncap_time": None,       # end_time - start_time
-        "uncap_obj": None,        # original_obj
-        "cap_iterations": None,   # k-1
-        "cap_obj": None,          # model.ObjVal
-        "extra_time": None,       # cap_end_time - cap_start_time
+        "sts": None,  # 0 or 1
+        "uncap_time": None,  # end_time - start_time
+        "uncap_obj": None,  # original_obj
+        "cap_iterations": None,  # k-1
+        "cap_obj": None,  # model.ObjVal
+        "extra_time": None,  # cap_end_time - cap_start_time
     }
     EPS = 1e-6
     R = inst["R"]
@@ -174,12 +173,12 @@ def generate_routes(instance: str, model: Model):
     # Track masks that are known infeasible to prune supersets quickly.
     infeasible_masks = set()
     bad_capacity = []
+
     def contains_infeasible_subset(mask):
         return any((mask & bad) == bad for bad in infeasible_masks)
 
-
     # ------------------- Subset Streaming with Early Pruning ------------------ #
-    costs = {}       # subset -> cost (objective contribution)
+    costs = {}  # subset -> cost (objective contribution)
     curr_time = time.perf_counter()
     pruned = processed = optimal_pruning = 0
     W_max = n  # upper bound on subset size
@@ -199,9 +198,9 @@ def generate_routes(instance: str, model: Model):
     max_n = 0
     processed_total = 0
     total_pruned = 0
-    for k in range(1, W_max + 1):       
-        costs_time = {}        # raw s_cost per subset (for pruning bound)
-        subsets_k = frontier   # already filtered by masks
+    for k in range(1, W_max + 1):
+        costs_time = {}  # raw s_cost per subset (for pruning bound)
+        subsets_k = frontier  # already filtered by masks
         valid_subsets = []
 
         if not subsets_k:
@@ -219,7 +218,7 @@ def generate_routes(instance: str, model: Model):
         total_pruned += pruned
         pruned = 0
 
-        if  len(subsets_k) > 100 and k >= mt_threshold:
+        if len(subsets_k) > 100 and k >= mt_threshold:
             # Parallel path
             batch = run_k_in_parallel(
                 subsets_k,
@@ -238,11 +237,11 @@ def generate_routes(instance: str, model: Model):
                     bad_capacity.append(subset_ids)
 
                 valid_subsets.append((subset_ids, mask, runtime))
-                costs_time[tuple(subset_ids)] = s_cost
-                # Pure travel cost: subtract service time contribution
-                costs[tuple(subset_ids)] = s_cost - sum(
+                costs_time[tuple(subset_ids)] = s_cost + sum(
                     service_time_r[r] for r in subset_ids
                 )
+                # Pure travel cost: subtract service time contribution
+                costs[tuple(subset_ids)] = s_cost 
                 processed += 1
         else:
             # Sequential path
@@ -258,12 +257,11 @@ def generate_routes(instance: str, model: Model):
                 if VEHICLE_CAPACITY and not is_capacity_ok(arcs):
                     bad_capacity.append(subset_ids)
 
-
                 valid_subsets.append((subset_ids, mask, runtime))
-                costs_time[tuple(subset_ids)] = s_cost
-                costs[tuple(subset_ids)] = s_cost - sum(
+                costs_time[tuple(subset_ids)] = s_cost + sum(
                     service_time_r[r] for r in subset_ids
                 )
+                costs[tuple(subset_ids)] = s_cost 
                 processed += 1
 
         print(
@@ -298,7 +296,9 @@ def generate_routes(instance: str, model: Model):
                     continue
 
                 # Quick feasibility bound: s_cost + service_time_r[p] <= l[depot]
-                if costs_time[tuple(ids)] + service_time_r[p] > l[depot]:
+                if (
+                    not Time_Window and costs_time[tuple(ids)] + service_time_r[p] > l[depot]
+                ):
                     optimal_pruning += 1
                     total_pruned += 1
                     continue
@@ -309,7 +309,9 @@ def generate_routes(instance: str, model: Model):
 
     if time_limit_hit:
         print("\n**********************************************")
-        print("Time limit reached. Master problem not solved; instance marked as unsolved.")
+        print(
+            "Time limit reached. Master problem not solved; instance marked as unsolved."
+        )
         print("**********************************************")
         metrics["sts"] = 0
         return metrics
@@ -322,15 +324,14 @@ def generate_routes(instance: str, model: Model):
         f"{sum(comb(n, k) for k in range(1, max_n)) - processed - total_pruned}"
     )
 
-
-
     # Map each request to all subsets that contain it
     result = {i: [] for i in range(len(R))}
     for s in costs.keys():
         for elem in s:
             result[elem].append(s)
-    
+
     original_obj = None
+
     def build_and_optimize():
         nonlocal original_obj
         model.reset()
@@ -349,8 +350,7 @@ def generate_routes(instance: str, model: Model):
         if not original_obj:
             original_obj = model.ObjVal
         return Z
-    
-   
+
     Z = build_and_optimize()
     end_time = time.perf_counter()
 
@@ -369,13 +369,15 @@ def generate_routes(instance: str, model: Model):
                     continue
                 _m, s_cost, _, _, runtime, work = Run_Time_Model(
                     route, inst, Time_Window=Time_Window, Capacity_Constraint=True
-                    )
+                )
                 total_work_units += work
                 if _m.Status == GRB.OPTIMAL:
-                    new_cost = s_cost - sum(service_time_r[r] for r in route)
+                    new_cost = s_cost
                     if abs(new_cost - costs[route]) > EPS:
-                        
-                        print(f"Updated {route} cost from {costs[route]:.2f} to {new_cost:.2f}")
+
+                        print(
+                            f"Updated {route} cost from {costs[route]:.2f} to {new_cost:.2f}"
+                        )
                         costs[route] = new_cost
                         bad_capacity.remove(route)
                         changed = True
@@ -409,16 +411,17 @@ def generate_routes(instance: str, model: Model):
                 print_subset_solution(inst, p, Capacity_Constraint=VEHICLE_CAPACITY)
             else:
                 print("Requests:", list(p), "Cost:", round(costs[p], 2))
-        
+
     print("\n**********************************************")
-    print(f"Column and Master runtime: {end_time - start_time:.2f}{f", Capacity Runtime: {cap_end_time-cap_start_time:.2f}" if VEHICLE_CAPACITY and k >= 2 else ''}")
+    print(
+        f"Column and Master runtime: {end_time - start_time:.2f}{f", Capacity Runtime: {cap_end_time-cap_start_time:.2f}" if VEHICLE_CAPACITY and k >= 2 else ''}"
+    )
     if VEHICLE_CAPACITY:
         print(f"Uncapacitated Obj Value: {original_obj:.2f}")
     print(f"{"Capacitated " if VEHICLE_CAPACITY else ''}Obj Value: {model.ObjVal:.2f}")
     print(f"Total Work Units: {total_work_units:.2f}")
     print("**********************************************")
-    
-    
+
     metrics["cap_iterations"] = k - 1
     metrics["extra_time"] = cap_end_time - cap_start_time
     metrics["sts"] = 1
@@ -438,12 +441,10 @@ def main(argv=None):
     path, _ = parse_instance_argv(argv, default_filename="l_4_25_4.txt")
     model = Model("MPDTW")
     generate_routes(str(path), model)
-    #run_all_instances()
+    # run_all_instances()
 
 
 # fill_results.py (put this in project root)
-
-
 
 
 def run_all_instances():
@@ -460,28 +461,27 @@ def run_all_instances():
     df = pd.read_excel(results_path)
 
     # Column names as they currently appear in results.xlsx
-    INSTANCE_COL = "Unnamed: 1"                     # Instance
-    STS_COL = "Uncapacitated Column Generation"     # Sts
-    UNCAP_OBJ_COL = "Unnamed: 3"                    # Obj
-    UNCAP_TIME_COL = "Unnamed: 4"                   # Time (s)
+    INSTANCE_COL = "Unnamed: 1"  # Instance
+    STS_COL = "Uncapacitated Column Generation"  # Sts
+    UNCAP_OBJ_COL = "Unnamed: 3"  # Obj
+    UNCAP_TIME_COL = "Unnamed: 4"  # Time (s)
 
     CAP_ITER_COL = "Capacitated Column Correction"  # Iterations
-    CAP_OBJ_COL = "Unnamed: 6"                      # Obj
-    EXTRA_TIME_COL = "Unnamed: 7"                   # Extra Time (s)
+    CAP_OBJ_COL = "Unnamed: 6"  # Obj
+    EXTRA_TIME_COL = "Unnamed: 7"  # Extra Time (s)
 
     # Same filter as your example main()
     filenames = [
-        f for f in os.listdir(instance_dir)
+        f
+        for f in os.listdir(instance_dir)
         if f.endswith(".txt")
         # skip any w* containing _200
         and (f.startswith("w_8") and "_200_5" in f)
         # skip any l_4_200_*
-        #and not f.startswith("l_4_200")
+        # and not f.startswith("l_4_200")
         # skip all w_4_100 except w_4_100_3
-        #and not (f.startswith("w_4_100") and f != "w_4_100_3.txt")
+        # and not (f.startswith("w_4_100") and f != "w_4_100_3.txt")
     ]
-
-
 
     filenames.sort(key=str.lower)
     print(filenames)
@@ -500,7 +500,9 @@ def run_all_instances():
 
         # --- SKIP IF THIS ROW ALREADY HAS RESULTS ---
         sts_val = df.loc[row_idx, STS_COL]
-        if not (pd.isna(sts_val) or (isinstance(sts_val, str) and sts_val.strip() == "")):
+        if not (
+            pd.isna(sts_val) or (isinstance(sts_val, str) and sts_val.strip() == "")
+        ):
             print(f"⏩ Skipping {instance_name} (already has Sts={sts_val})")
             continue
 
@@ -525,7 +527,6 @@ def run_all_instances():
             df.loc[row_idx, CAP_OBJ_COL] = "~"
             df.loc[row_idx, EXTRA_TIME_COL] = "~"
             sleep_time = 300
-
 
         else:
             # Solved: sts = 1 and we fill numbers from metrics
@@ -557,4 +558,3 @@ def run_all_instances():
 
 if __name__ == "__main__":
     main()
-

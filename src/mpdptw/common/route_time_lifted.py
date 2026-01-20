@@ -109,10 +109,11 @@ def Run_Time_Model(
     X = {(i, j): model.addVar(vtype=GRB.BINARY) for (i, j) in A_sub}
 
     # Cutoff based on sink's latest time
-    model.Params.Cutoff = float(l[sink])
+    CUTOFF = float(l[sink] - sum(d.get(i, 0.0) for i in N))
+    model.Params.Cutoff = CUTOFF
 
     # Objective: travel + service-at-origin
-    model.setObjective(quicksum(X[i, j] * (c[i, j] + d.get(i, 0.0)) for (i, j) in A_sub), GRB.MINIMIZE)
+    model.setObjective(quicksum(X[i, j] * c[i, j] for (i, j) in A_sub), GRB.MINIMIZE)
 
     # -------------------------- Optional capacity constraints -------------------- #
     if Capacity_Constraint:
@@ -146,6 +147,12 @@ def Run_Time_Model(
         # Tight big-Ms and bounds for S
         M_ij, Earliest, Latest = tight_bigM(out_arcs, t, d, V, A_sub, sink, e, l, Pr={r: Pr[r] for r in R}, Dr_single={r: Dr_single[r] for r in R})
         S = {i: model.addVar(vtype=GRB.CONTINUOUS, lb=Earliest[i], ub=Latest[i]) for i in V}
+
+
+        TimeWindowPrecendence = {
+            (i, j): model.addConstr(S[Dr_single[r]] >= S[i] + d[i] + t[i, Dr_single[r]])
+            for r in R for i in Pr[r]
+        }
 
         # Time-window feasibility on arcs
         TimeWindowFeas = {
@@ -341,11 +348,12 @@ def Run_Time_Model(
                 expr = sum_x({depot}, S) + sum_x_within(S | {dr})
                 cut_added |= add_cut_once(key, expr, len(S))
 
-    
-    model.Params.LazyConstraints = 1
+    if not Time_Window:
+        model.Params.LazyConstraints = 1
     if not Time_Window and not Capacity_Constraint:
         model.Params.Heuristics = 0
-
+    
+    model.Params.BranchDir = 1
     # ------------------------------- Solve & returns ------------------------------ #
     model.optimize(subtour_callback)
 
