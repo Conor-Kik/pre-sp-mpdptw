@@ -286,7 +286,7 @@ def generate_routes(instance: str, model: Model):
                 workers=psutil.cpu_count(logical=False),
                 pricing_threads=1,
             )
-            for mask, last, status, s_cost, arcs, runtime, _ in batch:
+            for mask, last, status, s_cost, arcs, runtime in batch:
                 if status in (GRB.INFEASIBLE, GRB.CUTOFF, "EXC"):
                     add_infeasible_mask(mask) 
                     pruned += 1
