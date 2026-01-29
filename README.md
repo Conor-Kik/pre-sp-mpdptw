@@ -39,12 +39,13 @@ MATH3205_MPDPTW_Project/
 │   └── mpdptw/
 │       ├── common/                 # IO utilities, preprocessing, helpers
 │       └── methods/
-│           └── col_generation/     # a-priori column generation solver
+│           └── PRE_SP/     
 │               └── multi_thread_route_generation.py
 │
 ├── mpdtw_instances_2019/           # Benchmark instance files
-├── docs/                           # Report, figures, and results
+├── routes/                         # Optimal route solutions
 ├── cli.py                          # CLI entrypoint
+├── results.xlsx                    # Reported Results
 └── README.txt
 ```
 
