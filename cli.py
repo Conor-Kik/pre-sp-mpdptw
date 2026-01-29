@@ -6,9 +6,9 @@ from typing import Dict
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
+# Multi-thread route generation is now the default for pre_sp.
 REGISTRY: Dict[str, str] = {
-    "pre_sp": "mpdptw.methods.col_generation.route_generation:main",
-    "pre_sp_mt": "mpdptw.methods.col_generation.multi_thread_route_generation:main",
+    "pre_sp": "mpdptw.methods.PRE_SP.multi_thread_route_generation:main",
 }
 
 
@@ -37,13 +37,8 @@ def main():
 
     solver_argv = sys.argv[2:]
 
-    # Handle --mt (multi-thread)
-    if method == "pre_sp" and "--mt" in solver_argv:
-        solver_argv.remove("--mt")
-        method = "pre_sp_mt"
-
     # Handle --cap flag
-    if method in {"pre_sp", "pre_sp_mt"} and "--cap" in solver_argv:
+    if method == "pre_sp" and "--cap" in solver_argv:
         solver_argv.remove("--cap")
         os.environ["ROUTE_GEN_CAP"] = "1"
 

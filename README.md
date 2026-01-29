@@ -18,6 +18,8 @@ Feasible single-vehicle routes are generated using a route-feasibility subproble
 - Pickup–delivery precedence respected  
 - (Capacitated variant) load feasibility enforced through a dynamic re-checking process  
 
+Route enumeration is multi-threaded by default to accelerate feasibility checking and pruning.
+
 Two pruning principles guarantee efficiency without sacrificing optimality:
 - Infeasibility Propagation — if a subset of requests is infeasible, all its supersets are discarded.
 - Horizon-Based Pruning — subsets that cannot fit within the global time horizon are eliminated.
@@ -37,8 +39,8 @@ MATH3205_MPDPTW_Project/
 │   └── mpdptw/
 │       ├── common/                 # IO utilities, preprocessing, helpers
 │       └── methods/
-│           └──col_generation/      #a-priori column generation solver
-│               └── multi_thread_route_generation.py 
+│           └── col_generation/     # a-priori column generation solver
+│               └── multi_thread_route_generation.py
 │
 ├── mpdtw_instances_2019/           # Benchmark instance files
 ├── docs/                           # Report, figures, and results
@@ -57,18 +59,20 @@ The entry point is cli.py.
 python cli.py pre_sp <instance_filename> [options]
 ```
 
-### Arguments:
+### Arguments
 - <instance_filename>  file in mpdtw_instances_2019/
 - [options]
-  - --mt enable multi-threaded enumeration
   - --cap enable capacity verification / correction
 
+Multi-threaded route enumeration is enabled by default.
+
+---
 
 ### Examples
 ```bash
 python cli.py pre_sp l_4_25_1.txt
-python cli.py pre_sp w_8_100_4.txt --mt
-python cli.py pre_sp n_8_200_4.txt --mt --cap
+python cli.py pre_sp w_8_100_4.txt
+python cli.py pre_sp n_8_200_4.txt --cap
 ```
 
 ---
@@ -76,11 +80,6 @@ python cli.py pre_sp n_8_200_4.txt --mt --cap
 ## Benchmarking and Performance
 
 This solver has been evaluated on the 120 classical MPDPTW benchmarks and additional 200-node synthetic instances.
-
-Key outcomes reported:
-- Solves 116 / 120 benchmark instances to proven optimality
-- Particularly strong on wide and weakly structured time-window cases (W-type) where classical MIP approaches struggle
-- Successfully solves multiple 200-node instances, demonstrating scalability when structural pruning is effective
 
 ---
 
