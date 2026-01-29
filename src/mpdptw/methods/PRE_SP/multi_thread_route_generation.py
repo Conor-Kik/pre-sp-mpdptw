@@ -170,7 +170,7 @@ def generate_routes(instance: str, model: Model):
     if COMPARE_TO_RESULTS:
         project_root = Path(__file__).resolve().parents[4]
 
-        results_path = project_root / "final_results.xlsx"
+        results_path = project_root / "results.xlsx"
         df = pd.read_excel(
             results_path,
             header=1,        
