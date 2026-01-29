@@ -345,7 +345,7 @@ def generate_routes(instance: str, model: Model):
             model, Z = build_and_optimize(costs, result)
 
             msg = f"Current best objective: {round(model.ObjVal, 2)}"
-            if COMPARE_TO_RESULTS:
+            if COMPARE_TO_RESULTS and isinstance(optimal_objective, (int, float)):
                 gap = round(100 * abs(model.ObjVal - optimal_objective) / model.ObjVal, 2)
                 msg += f" - Gap to Optimal {gap}%"
             print(msg + "\n")
