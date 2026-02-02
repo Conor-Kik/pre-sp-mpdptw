@@ -13,10 +13,10 @@ import pandas as pd
 from collections import defaultdict
 
 # ---------------------------- Configuration Flags ---------------------------- #
-VEHICLE_CAPACITY = 0  # whether to enforce capacity feasibility via re-run
+VEHICLE_CAPACITY = 0  # whether to enforce capacity feasibility via re-run - don't change
 PRINT_ROUTES = False  # whether to print full routes after optimization
 MAX_SUBSET = None # Pruned enumeration termination - None if no termination
-COMPARE_TO_RESULTS = True #Compares to the optimal solutions in results.xslx 
+COMPARE_TO_RESULTS = False #Compares to the optimal solutions in results.xslx 
 TIME_LIMIT = 3600 
 
 def mask_to_ids(mask: int):
@@ -486,7 +486,6 @@ def generate_routes(instance: str, model: Model):
     return metrics
 
 
-# ------------------------------------ CLI ----------------------------------- #
 def main(argv=None):
     global VEHICLE_CAPACITY
     if os.environ.get("ROUTE_GEN_CAP") == "1":
