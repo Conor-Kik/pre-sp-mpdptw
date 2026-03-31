@@ -62,7 +62,6 @@ def Run_Time_Model(
     if Time_Lim:
         model.setParam("TimeLimit", len(subset) * 3)
     model.setParam("Seed", 123)
-
     # ------------------------------- Instance data ------------------------------- #
     A_all = inst["A_feasible_ext"]
     Pr = inst["Pr"]
@@ -104,7 +103,6 @@ def Run_Time_Model(
             node_req[p] = r
         node_req[Dr_single[r]] = r
     node_type = {"delivery": set(Dels), "pickup": set(Pickups)}
-
     # ------------------------------- Decision vars ------------------------------- #
     X = {(i, j): model.addVar(vtype=GRB.BINARY) for (i, j) in A_sub}
 
@@ -229,7 +227,6 @@ def Run_Time_Model(
 
     model._sec_seen = set()
     model._seen = set()
-
     def subtour_callback(model, where):
         if where != GRB.Callback.MIPSOL:
             return
@@ -355,7 +352,12 @@ def Run_Time_Model(
     
     model.Params.BranchDir = 1
     # ------------------------------- Solve & returns ------------------------------ #
-    model.optimize(subtour_callback)
+    
+    if Time_Window:
+        model.optimize()
+        
+    else:
+        model.optimize(subtour_callback)
 
 
 
