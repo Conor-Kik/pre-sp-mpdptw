@@ -16,7 +16,6 @@ from collections import defaultdict
 VEHICLE_CAPACITY = 0  # whether to enforce capacity feasibility via re-run - don't change
 PRINT_ROUTES = False  # whether to print full routes after optimization
 MAX_SUBSET = None # Pruned enumeration termination - None if no termination
-COMPARE_TO_RESULTS = False #Compares to the optimal solutions in results.xslx 
 TIME_LIMIT = 3600 
 
 def mask_to_ids(mask: int):
@@ -117,16 +116,14 @@ def generate_routes(instance: str, model: Model):
     time_limit_hit = False
     inst = build_milp_data(str(instance), generate_W_set=False)
     metrics = {
-        "uncap_time": None,  # end_time - start_time
-        "uncap_obj": None,  # original_obj
-        "cap_iterations": None,  # k-1
-        "cap_obj": None,  # model.ObjVal
-        "extra_time": None,  # cap_end_time - cap_start_time
-        "Feasible Routes" : None,
-        "Infeasible Routes" : None
+
     }
+    
     EPS = 1e-6
     R = inst["R"]
+    print()
+    print("Requests", len(R))
+    print()
     Pr = inst["Pr"]
     Dr_single = inst["Dr_single"]
     d = inst["d"]
@@ -162,32 +159,19 @@ def generate_routes(instance: str, model: Model):
     infeasible_masks = set()
     infeasible_by_bit = defaultdict(list) 
     bad_capacity = []
-
+    infeas_at_level = []
     result = {i: [] for i in range(len(R))}
     runtime_remove = 0
 
 
-    if COMPARE_TO_RESULTS:
-        project_root = Path(__file__).resolve().parents[4]
 
-        results_path = project_root / "results.xlsx"
-        df = pd.read_excel(
-            results_path,
-            header=1,        
-            usecols="B:I",  
-            nrows=150       
-        )
-
-        target_filename = filename.removesuffix(".txt")
-        optimal_objective = df.loc[
-            df["Instance"] == target_filename,
-            "Uncapacitated Objective"
-        ].iloc[0]
 
     original_obj = None
-
+    time_in_master = 0
     def build_and_optimize(cost_values, route_subsets, final_run = False):
         nonlocal original_obj
+        nonlocal time_in_master
+        start_time = time.time()
         model = Model("Master Problem")
         model.setParam("OutputFlag", 0)
         # Binary selection variables per generated subset
@@ -204,6 +188,7 @@ def generate_routes(instance: str, model: Model):
         model.optimize()
         if final_run:
             original_obj = model.ObjVal
+        time_in_master += time.time() - start_time
         return model, Z
 
 
@@ -244,10 +229,10 @@ def generate_routes(instance: str, model: Model):
         if not contains_infeasible_subset(m):
             frontier.append((m, p))  # (mask, last_index)
 
-
+    mask_pruned = 0 
     max_n = 0
     processed_total = 0
-    total_pruned = 0
+    infeasible_found = 0
     
     upper = min(W_max + 1, MAX_SUBSET + 2) if MAX_SUBSET is not None else W_max + 1
 
@@ -255,15 +240,16 @@ def generate_routes(instance: str, model: Model):
         costs_time = {}  # raw s_cost per subset (for pruning bound)
         subsets_k = frontier  # already filtered by masks
         valid_subsets = []
-        total_pruned += pruned
+        infeasible_found += pruned
+        pruned = 0
         if MAX_SUBSET is not None and k == MAX_SUBSET + 1:
-            max_n = k
-            total_pruned -= optimal_pruning
+
+            infeasible_found -= optimal_pruning
             print("Terminating - Max Subset Reached")
             break
 
         if not subsets_k:
-            max_n = k
+            metrics["Max subset"] = k - 1
             print("Skipping - All subsets pruned")
             break
 
@@ -275,7 +261,6 @@ def generate_routes(instance: str, model: Model):
 
         start_process = processed
         
-        pruned = 0
 
         if len(subsets_k) > 100 and k >= mt_threshold:
             # Parallel path
@@ -308,6 +293,7 @@ def generate_routes(instance: str, model: Model):
         else:
             # Sequential path
             for mask, last in subsets_k:
+                
                 subset_ids = mask_to_ids(mask)
                 _m, s_cost, arcs, _, runtime, _ = Run_Time_Model(
                     subset_ids, inst, Time_Window=Time_Window
@@ -330,8 +316,10 @@ def generate_routes(instance: str, model: Model):
             f"Time: {time.perf_counter()-curr_time:.2f}, "
             f"Cumulative: {time.perf_counter() - start_time - runtime_remove:.2f}\n"
             f"Infeasible Found: {pruned}, "
-            f"Valid Routes Found: {processed - start_process}"
+            f"Valid Routes Found: {processed - start_process}\n"
+         f"Infeas among Feas Rate: {100*pruned/len(subsets_k):.2f}%"
         )
+        
 
         elapsed = time.perf_counter() - start_time
         if elapsed > TIME_LIMIT:
@@ -341,17 +329,8 @@ def generate_routes(instance: str, model: Model):
             )
             time_limit_hit = True
             break
-        if k >= 2:
-            model, Z = build_and_optimize(costs, result)
-
-            msg = f"Current best objective: {round(model.ObjVal, 2)}"
-            if COMPARE_TO_RESULTS and isinstance(optimal_objective, (int, float)):
-                gap = round(100 * abs(model.ObjVal - optimal_objective) / model.ObjVal, 2)
-                msg += f" - Gap to Optimal {gap}%"
-            print(msg + "\n")
-            runtime_remove += model.Runtime
-        else:
-            print()
+        
+        print()
         curr_time = time.perf_counter()
         
         processed_total += processed
@@ -367,15 +346,18 @@ def generate_routes(instance: str, model: Model):
             for p in range(last + 1, n):
                 new_mask = mask | (1 << p)
                 if contains_infeasible_subset(new_mask):
+                    mask_pruned += 1
                     continue
 
                 # Quick feasibility bound: s_cost + service_time_r[p] <= l[depot]
                 if (not Time_Window and costs_time[mask] + service_time_r[p] > l[depot]):
                     optimal_pruning += 1
-                    total_pruned += 1
+                    mask_pruned += 1
                     continue
 
                 next_frontier.append((new_mask, p))
+        #infeas_at_level.append(len(next_frontier)/len(subsets_k))
+        infeas_at_level.append(len(subsets_k))
 
         frontier = next_frontier
 
@@ -390,9 +372,9 @@ def generate_routes(instance: str, model: Model):
     # ------------------------------- Summary Log ------------------------------ #
     print(
         f"\nAll columns generated. Valid Routes: {processed}. "
-        f"\nInfeasible Found: {total_pruned}, "
-        f"Subsets (≤ length {max_n - 1}) pruned from infeasible: "
-        f"{sum(comb(n, k) for k in range(1, max_n)) - processed - total_pruned}"
+        f"\nInfeasible Found: {infeasible_found}, "
+        f"Mask Pruned: {mask_pruned}\n"
+        f"Infeasibility rate among solved {100*infeasible_found/(infeasible_found+processed):.2f}%\n"
     )
 
 
@@ -471,20 +453,30 @@ def generate_routes(instance: str, model: Model):
     print(
         f"Column and Master runtime: {end_time - start_time:.2f}{f", Capacity Runtime: {cap_end_time-cap_start_time:.2f}" if VEHICLE_CAPACITY and k >= 2 else ''}"
     )
+    total_sp_time = cap_end_time-cap_start_time+ end_time - start_time-time_in_master
+    enum_percentage = 100*total_sp_time/(total_sp_time+time_in_master)
+    print(
+        f"Time spent in subproblem: {total_sp_time:.2f} ~ {enum_percentage:.2f}% | {f", Time spend in master: {round(time_in_master,2) if time_in_master > 0.01 else "<0.01"} "}"
+    )
     if VEHICLE_CAPACITY:
         print(f"Uncapacitated Obj Value: {original_obj:.2f}")
     print(f"{"Capacitated " if VEHICLE_CAPACITY else ''}Obj Value: {model.ObjVal:.2f}")
     print("**********************************************")
 
-    metrics["cap_iterations"] = k - 1
-    metrics["extra_time"] = cap_end_time - cap_start_time
+    
+    
     metrics["uncap_time"] = end_time - start_time
+    metrics["sp_time"] = time_in_master
     metrics["uncap_obj"] = original_obj
-    metrics["cap_obj"] = model.ObjVal
+    if VEHICLE_CAPACITY:
+        metrics["cap_iterations"] = k - 1
+        metrics["cap_obj"] = model.ObjVal
+        metrics["extra_time"] = cap_end_time - cap_start_time
     metrics["Feasible Routes"] = processed
-    metrics["Infeasible Routes"] = total_pruned
+    metrics["Infeasible Routes"] = infeasible_found
+    metrics["Infeas at K"] = infeas_at_level
+    metrics["Enumeration Percentage"] = enum_percentage
     return metrics
-
 
 def main(argv=None):
     global VEHICLE_CAPACITY
@@ -492,7 +484,7 @@ def main(argv=None):
         VEHICLE_CAPACITY = 1
     else:
         VEHICLE_CAPACITY = 0
-    path, _ = parse_instance_argv(argv, default_filename="l_4_25_4.txt")
+    path, _ = parse_instance_argv(argv)
     model = Model("MPDTW")
     
     metrics = generate_routes(str(path), model)
